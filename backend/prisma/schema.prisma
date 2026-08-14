@@ -1,0 +1,734 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+  MODERATOR
+  FINANCE
+  SUPPORT
+  FRAUD_ANALYST
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  RESTRICTED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum PlatformCategory {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  X
+  LINKEDIN
+  TELEGRAM
+  DISCORD
+  PINTEREST
+  OTHER
+}
+
+enum ActionCategory {
+  FOLLOW
+  LIKE
+  COMMENT
+  SUBSCRIBE
+  SHARE_REPOST
+  JOIN
+  VISIT
+  WATCH
+  CUSTOM
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PENDING_REVIEW
+  CHANGES_REQUIRED
+  APPROVED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MONEY
+  POINTS
+  MONEY_AND_POINTS
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum TaskAttemptStatus {
+  STARTED
+  SUBMITTED
+  VERIFYING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum WatchSessionStatus {
+  STARTED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  VERIFICATION_PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum PointTransactionType {
+  TASK_REWARD
+  CAMPAIGN_PURCHASE
+  REFERRAL_REWARD
+  POINT_REDEMPTION
+  ADMIN_ADJUSTMENT
+  BONUS
+  REFUND
+}
+
+enum CashTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  CAMPAIGN_PURCHASE
+  POINT_REDEMPTION_PAYOUT
+  ADMIN_ADJUSTMENT
+  REFUND
+}
+
+enum ExternalReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUIRED
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum AuditAction {
+  LOGIN
+  USER_SUSPENDED
+  USER_BANNED
+  USER_RESTORED
+  CAMPAIGN_APPROVED
+  CAMPAIGN_REJECTED
+  CAMPAIGN_PAUSED
+  CAMPAIGN_REFUNDED
+  REWARD_RULE_CHANGED
+  POINT_CONVERSION_CHANGED
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_REJECTED
+  EXTERNAL_LINK_APPROVED
+  EXTERNAL_LINK_REJECTED
+  SYSTEM_SETTING_CHANGED
+}
+
+// ==========================================
+// USER & IDENTITY MODELS
+// ==========================================
+
+model User {
+  id                   String            @id @default(uuid())
+  email                String            @unique
+  username             String            @unique
+  passwordHash         String
+  fullName             String
+  country              String
+  role                 UserRole          @default(USER)
+  status               AccountStatus     @default(ACTIVE)
+  emailVerified        Boolean           @default(false)
+  emailVerificationToken String?
+  passwordResetToken   String?
+  twoFactorEnabled     Boolean           @default(false)
+  twoFactorSecret      String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  profile              UserProfile?
+  sessions             UserSession[]
+  pointWallet          PointWallet?
+  cashWallet           CashWallet?
+  pointTransactions    PointTransaction[]
+  cashTransactions     CashTransaction[]
+  campaigns            Campaign[]
+  taskAttempts         TaskAttempt[]
+  taskParticipants     TaskParticipant[]
+  watchSessions        WatchSession[]
+  externalReviews      ExternalLinkReview[] @relation("SubmittedReviews")
+  reviewedExternalLinks ExternalLinkReview[] @relation("ReviewedExternalLinks")
+  referrals            Referral[]        @relation("Referrer")
+  referredBy           Referral?         @relation("ReferredUser")
+  referralRewards      ReferralReward[]
+  notifications        Notification[]
+  notificationPref     NotificationPreference?
+  reportsSubmitted     Report[]          @relation("ReportedBy")
+  reportsAgainst       Report[]          @relation("ReportedUser")
+  disputes             Dispute[]
+  fraudEvents          FraudEvent[]
+  riskScore            RiskScore?
+  devices              Device[]
+  ipRecords            IPRecord[]
+  withdrawals          Withdrawal[]
+  auditLogs            AuditLog[]        @relation("AdminAuditLogs")
+}
+
+model UserProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  avatarUrl        String?
+  bio              String?
+  level            Int      @default(1)
+  xp               Int      @default(0)
+  tasksCompleted   Int      @default(0)
+  campaignsCreated Int      @default(0)
+  watchMinutes     Int      @default(0)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  isRevoked    Boolean  @default(false)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  fullName     String
+  role         UserRole @default(ADMIN)
+  is2FAEnabled Boolean  @default(true)
+  twoFactorSecret String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ==========================================
+// IMMUTABLE WALLETS & LEDGERS
+// ==========================================
+
+model PointWallet {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  availablePoints  Float    @default(0)
+  pendingPoints    Float    @default(0)
+  totalEarned      Float    @default(0)
+  totalSpent       Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CashWallet {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  availableBalance Float    @default(0)
+  pendingBalance   Float    @default(0)
+  totalEarned      Float    @default(0)
+  totalWithdrawn   Float    @default(0)
+  currency         String   @default("NGN")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PointTransaction {
+  id            String               @id @default(uuid())
+  userId        String
+  type          PointTransactionType
+  amount        Float
+  source        String
+  referenceId   String?
+  balanceBefore Float
+  balanceAfter  Float
+  description   String
+  status        String               @default("COMPLETED")
+  createdAt     DateTime             @default(now())
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([referenceId])
+}
+
+model CashTransaction {
+  id            String              @id @default(uuid())
+  userId        String
+  type          CashTransactionType
+  amount        Float
+  source        String
+  referenceId   String?
+  balanceBefore Float
+  balanceAfter  Float
+  currency      String              @default("NGN")
+  description   String
+  status        String              @default("COMPLETED")
+  createdAt     DateTime            @default(now())
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([referenceId])
+}
+
+// ==========================================
+// CAMPAIGNS & TASKS
+// ==========================================
+
+model Campaign {
+  id                String            @id @default(uuid())
+  title             String
+  description       String?
+  userId            String
+  platform          PlatformCategory
+  action            ActionCategory
+  targetUrl         String
+  targetQuantity    Int
+  completedQuantity Int               @default(0)
+  remainingQuantity Int
+  rewardPerTask     Float
+  totalCostMoney    Float             @default(0)
+  totalCostPoints   Float             @default(0)
+  paymentMethod     PaymentMethod     @default(MONEY)
+  paymentStatus     PaymentStatus     @default(PENDING)
+  status            CampaignStatus    @default(DRAFT)
+  instructions      String?
+  customPlatformName String?
+  watchDurationMin  Int?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events            CampaignEvent[]
+  payments          CampaignPayment[]
+  tasks             Task[]
+  taskAttempts      TaskAttempt[]
+  taskParticipants  TaskParticipant[]
+  watchSessions     WatchSession[]
+  externalReviews   ExternalLinkReview[]
+
+  @@index([userId])
+  @@index([platform, status])
+}
+
+model CampaignEvent {
+  id         String   @id @default(uuid())
+  campaignId String
+  eventType  String
+  message    String
+  metadata   String?
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model CampaignPayment {
+  id            String        @id @default(uuid())
+  campaignId    String
+  provider      String        // STRIPE, PAYSTACK, FLUTTERWAVE, POINTS
+  transactionRef String       @unique
+  amountMoney   Float         @default(0)
+  amountPoints  Float         @default(0)
+  currency      String        @default("NGN")
+  status        PaymentStatus @default(PENDING)
+  metadata      String?
+  createdAt     DateTime      @default(now())
+  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id            String           @id @default(uuid())
+  campaignId    String
+  platform      PlatformCategory
+  action        ActionCategory
+  title         String
+  targetUrl     String
+  rewardPoints  Float
+  status        String           @default("ACTIVE")
+  createdAt     DateTime         @default(now())
+  campaign      Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  attempts      TaskAttempt[]
+}
+
+model TaskAttempt {
+  id                 String            @id @default(uuid())
+  userId             String
+  campaignId         String
+  taskId             String?
+  status             TaskAttemptStatus @default(STARTED)
+  proofUrl           String?
+  proofText          String?
+  rejectionReason    String?
+  startedAt          DateTime          @default(now())
+  submittedAt        DateTime?
+  verifiedAt         DateTime?
+  rewardAmountPoints Float             @default(0)
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign           Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  task               Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, campaignId])
+}
+
+model TaskParticipant {
+  id          String         @id @default(uuid())
+  userId      String
+  campaignId  String
+  actionType  ActionCategory
+  status      String         @default("COMPLETED")
+  rewardedAt  DateTime       @default(now())
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign    Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Enforces strictly ONE reward per user per campaign & action type (anti-duplicate)
+  @@unique([userId, campaignId, actionType])
+  @@index([userId])
+}
+
+// ==========================================
+// WATCH ENGINE & LIMITS
+// ==========================================
+
+model WatchSession {
+  id                 String             @id @default(uuid())
+  userId             String
+  campaignId         String
+  startedAt          DateTime           @default(now())
+  endedAt            DateTime?
+  durationSeconds    Int                @default(0)
+  status             WatchSessionStatus @default(STARTED)
+  verificationStatus String             @default("PENDING")
+  rewardPoints       Float              @default(0)
+  riskScore          Float              @default(0)
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign           Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([userId, campaignId])
+}
+
+model WatchLimit {
+  id                   String           @id @default(uuid())
+  platform             PlatformCategory @default(YOUTUBE)
+  maxContributionMin   Int              @default(30)
+  maxSessionsPerUser   Int              @default(3)
+  minSessionDurationMin Int             @default(5)
+  maxDailyContributionMin Int           @default(60)
+  cooldownMinutes      Int              @default(15)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+// ==========================================
+// GOVERNANCE & EXTERNAL LINK REVIEWS
+// ==========================================
+
+model ExternalLinkReview {
+  id           String               @id @default(uuid())
+  campaignId   String
+  submittedById String
+  url          String
+  platformName String
+  taskType     ActionCategory
+  status       ExternalReviewStatus @default(PENDING)
+  reviewerId   String?
+  reviewReason String?
+  createdAt    DateTime             @default(now())
+  reviewedAt   DateTime?
+
+  campaign     Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  submittedBy  User                 @relation("SubmittedReviews", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewer     User?                @relation("ReviewedExternalLinks", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+model SocialPlatform {
+  id          String           @id @default(uuid())
+  category    PlatformCategory @unique
+  name        String
+  iconUrl     String?
+  isEnabled   Boolean          @default(true)
+  description String?
+  createdAt   DateTime         @default(now())
+  actions     PlatformAction[]
+}
+
+model PlatformAction {
+  id                 String           @id @default(uuid())
+  platformId         String
+  category           ActionCategory
+  name               String
+  baseRewardPoints   Float            @default(10)
+  multiplier         Float            @default(1.0)
+  minRewardPoints    Float            @default(5)
+  maxRewardPoints    Float            @default(500)
+  verificationMethod String           @default("AUTOMATED")
+  isEnabled          Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+
+  platform           SocialPlatform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, category])
+}
+
+model RewardRule {
+  id                 String           @id @default(uuid())
+  platform           PlatformCategory
+  action             ActionCategory
+  baseRewardPoints   Float
+  multiplier         Float            @default(1.0)
+  minPoints          Float            @default(5)
+  maxPoints          Float            @default(1000)
+  verificationMethod String           @default("AUTOMATED")
+  isEnabled          Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([platform, action])
+}
+
+model PointConversionRule {
+  id                   String   @id @default(uuid())
+  pointsToCashRate     Float    @default(0.5) // e.g. 1000 points = 500 NGN cash
+  pointsToCreditRate   Float    @default(0.5) // e.g. 1000 points = 500 NGN campaign credit
+  minRedemptionPoints  Float    @default(1000)
+  maxRedemptionPoints  Float    @default(50000)
+  dailyRedemptionLimit Float    @default(100000)
+  withdrawalFeePercent Float    @default(1.5)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// ==========================================
+// REFERRALS, NOTIFICATIONS, DISPUTES
+// ==========================================
+
+model Referral {
+  id             String   @id @default(uuid())
+  referrerId     String
+  referredUserId String   @unique
+  referralCode   String
+  status         String   @default("COMPLETED")
+  rewardClaimed  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  referrer       User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser   User     @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+}
+
+model ReferralReward {
+  id           String   @id @default(uuid())
+  userId       String
+  amountPoints Float
+  sourceUserId String
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  linkUrl   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model NotificationPreference {
+  id                  String  @id @default(uuid())
+  userId              String  @unique
+  emailTaskVerified   Boolean @default(true)
+  emailCampaignUpdate Boolean @default(true)
+  emailWithdrawal     Boolean @default(true)
+  inAppNotifications  Boolean @default(true)
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reportedById   String
+  reportedUserId String?
+  targetType     String   // CAMPAIGN, TASK, USER
+  targetId       String
+  reason         String
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+
+  reportedBy     User     @relation("ReportedBy", fields: [reportedById], references: [id], onDelete: Cascade)
+  reportedUser   User?    @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+}
+
+model Dispute {
+  id          String   @id @default(uuid())
+  userId      String
+  campaignId  String?
+  attemptId   String?
+  subject     String
+  description String
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// FRAUD ENGINE & SECURITY
+// ==========================================
+
+model RiskScore {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  score                Int      @default(0) // 0 - 100
+  status               String   @default("NORMAL") // NORMAL, REVIEW_REQUIRED, HIGH_RISK
+  lastEvaluatedAt      DateTime @default(now())
+  suspiciousDeviceCount Int     @default(0)
+  suspiciousIPCount    Int      @default(0)
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FraudEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  eventType String
+  details   String
+  riskDelta Int      @default(10)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  userId      String
+  fingerprint String
+  deviceModel String?
+  browser     String?
+  os          String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([fingerprint])
+}
+
+model IPRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  ipAddress   String
+  country     String?
+  isProxy     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ipAddress])
+}
+
+// ==========================================
+// WITHDRAWALS & PAYMENT METHODS
+// ==========================================
+
+model WithdrawalMethod {
+  id            String   @id @default(uuid())
+  userId        String
+  bankName      String
+  accountNumber String
+  accountName   String
+  isDefault     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model Withdrawal {
+  id              String           @id @default(uuid())
+  userId          String
+  amountCash      Float
+  feeCash         Float            @default(0)
+  netAmountCash   Float
+  currency        String           @default("NGN")
+  bankName        String
+  accountNumber   String
+  accountName     String
+  status          WithdrawalStatus @default(REQUESTED)
+  rejectionReason String?
+  requestedAt     DateTime         @default(now())
+  processedAt     DateTime?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ==========================================
+// ADMIN AUDIT LOGS & SYSTEM SETTINGS
+// ==========================================
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  adminUserId String
+  action      AuditAction
+  targetType  String?
+  targetId    String?
+  details     String
+  ipAddress   String?
+  createdAt   DateTime    @default(now())
+
+  adminUser   User        @relation("AdminAuditLogs", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}

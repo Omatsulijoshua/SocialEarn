@@ -1,0 +1,24 @@
+{
+  "name": "socialearn-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SocialEarn - Social Task, Engagement & Rewards Marketplace",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
+    "build": "cd backend && npm run build && cd ../apps/web && npm run build",
+    "test": "cd backend && npm test",
+    "prisma:generate": "cd backend && npx prisma generate",
+    "prisma:push": "cd backend && npx prisma db push"
+  },
+  "workspaces": [
+    "apps/*",
+    "backend",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.0"
+  }
+}
