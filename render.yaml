@@ -1,0 +1,87 @@
+# Render Infrastructure Blueprint — SocialEarn Monorepo
+
+services:
+  # ----------------------------------------------------
+  # 1. Backend REST API & WebSocket Gateway
+  # ----------------------------------------------------
+  - type: web
+    name: socialearn-backend
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install && cd backend && npx prisma generate && npm run build
+    startCommand: cd backend && npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: socialearn-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: socialearn-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+  # ----------------------------------------------------
+  # 2. User Dashboard & Public Marketplace (apps/web)
+  # ----------------------------------------------------
+  - type: web
+    name: socialearn-web
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install && cd apps/web && npm run build
+    startCommand: cd apps/web && npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: socialearn-backend
+          property: url
+
+  # ----------------------------------------------------
+  # 3. Dedicated Admin Console (apps/admin)
+  # ----------------------------------------------------
+  - type: web
+    name: socialearn-admin
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install && cd apps/admin && npm run build
+    startCommand: cd apps/admin && npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: socialearn-backend
+          property: url
+
+# ----------------------------------------------------
+# Database Infrastructure Services
+# ----------------------------------------------------
+databases:
+  - name: socialearn-postgres
+    databaseName: socialearn
+    user: socialearn_user
+    plan: starter
+    region: oregon
+
+# Redis Cache Service
+services:
+  - type: redis
+    name: socialearn-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: allkeys-lru

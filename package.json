@@ -6,9 +6,13 @@
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
     "dev:web": "cd apps/web && npm run dev",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
-    "build": "cd backend && npm run build && cd ../apps/web && npm run build",
-    "test": "cd backend && npm test",
+    "dev:admin": "cd apps/admin && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:admin\"",
+    "build:backend": "cd backend && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "build:admin": "cd apps/admin && npm run build",
+    "build": "npm run build:backend && npm run build:web && npm run build:admin",
+    "test": "node backend/src/tests/runTests.js && node apps/admin/tests/runAdminTests.js",
     "prisma:generate": "cd backend && npx prisma generate",
     "prisma:push": "cd backend && npx prisma db push"
   },
