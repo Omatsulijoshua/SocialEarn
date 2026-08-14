@@ -8,7 +8,7 @@ services:
     name: socialearn-backend
     env: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: npm install && cd backend && npx prisma generate && npm run build
     startCommand: cd backend && npm run start
     envVars:
@@ -37,7 +37,7 @@ services:
     name: socialearn-web
     env: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: npm install && cd apps/web && npm run build
     startCommand: cd apps/web && npm run start
     envVars:
@@ -47,7 +47,7 @@ services:
         fromService:
           type: web
           name: socialearn-backend
-          property: url
+          property: host
 
   # ----------------------------------------------------
   # 3. Dedicated Admin Console (apps/admin)
@@ -56,7 +56,7 @@ services:
     name: socialearn-admin
     env: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: npm install && cd apps/admin && npm run build
     startCommand: cd apps/admin && npm run start
     envVars:
@@ -66,7 +66,19 @@ services:
         fromService:
           type: web
           name: socialearn-backend
-          property: url
+          property: host
+
+  # ----------------------------------------------------
+  # 4. Redis Cache Service
+  # ----------------------------------------------------
+  - type: redis
+    name: socialearn-redis
+    region: oregon
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: Allow internal services
 
 # ----------------------------------------------------
 # Database Infrastructure Services
@@ -75,13 +87,5 @@ databases:
   - name: socialearn-postgres
     databaseName: socialearn
     user: socialearn_user
-    plan: starter
+    plan: free
     region: oregon
-
-# Redis Cache Service
-services:
-  - type: redis
-    name: socialearn-redis
-    region: oregon
-    plan: starter
-    maxmemoryPolicy: allkeys-lru
