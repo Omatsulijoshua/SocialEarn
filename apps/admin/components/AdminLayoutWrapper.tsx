@@ -68,6 +68,14 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen flex bg-[#0f172a] text-slate-100">
+      {/* MOBILE BACKDROP OVERLAY */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-30 bg-black/80 backdrop-blur-sm md:hidden transition-opacity"
+        />
+      )}
+
       {/* ENTERPRISE DARK SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#090d16] border-r border-slate-800 transform ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col`}>
         <div className="h-20 px-6 flex items-center justify-between border-b border-slate-800">
