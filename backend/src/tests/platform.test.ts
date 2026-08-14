@@ -175,8 +175,8 @@ describe('SocialEarn Platform Core Engines & E2E Scenarios', () => {
     expect(publicMarketplaceActive.find(c => c.id === campaignId)).toBeUndefined();
 
     // 3. Admin approves external link
-    review.status = 'APPROVED';
-    campaign.status = 'ACTIVE';
+    review.status = 'APPROVED' as any;
+    campaign.status = 'ACTIVE' as any;
 
     // 4. Campaign is now ACTIVE and appears in marketplace!
     const updatedMarketplace = dbStore.campaigns.filter(c => c.status === 'ACTIVE');

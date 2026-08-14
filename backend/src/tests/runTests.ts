@@ -145,7 +145,7 @@ try {
   assert(!initialMarketplace.some(c => c.id === campaignId), 'Pending review campaign hidden from public marketplace');
 
   // Admin approves link
-  cmp.status = 'ACTIVE';
+  cmp.status = 'ACTIVE' as any;
   const activeMarketplace = dbStore.campaigns.filter(c => c.status === 'ACTIVE');
   assert(activeMarketplace.some(c => c.id === campaignId), 'Approved external campaign activated in public marketplace');
 } catch (e: any) {
