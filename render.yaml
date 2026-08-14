@@ -17,14 +17,9 @@ services:
       - key: PORT
         value: 5000
       - key: DATABASE_URL
-        fromDatabase:
-          name: socialearn-postgres
-          property: connectionString
+        sync: false
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: socialearn-redis
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -67,25 +62,3 @@ services:
           type: web
           name: socialearn-backend
           property: host
-
-  # ----------------------------------------------------
-  # 4. Redis Cache Service
-  # ----------------------------------------------------
-  - type: redis
-    name: socialearn-redis
-    region: oregon
-    plan: free
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: Allow internal services
-
-# ----------------------------------------------------
-# Database Infrastructure Services
-# ----------------------------------------------------
-databases:
-  - name: socialearn-postgres
-    databaseName: socialearn
-    user: socialearn_user
-    plan: free
-    region: oregon
